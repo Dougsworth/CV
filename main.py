@@ -1,60 +1,70 @@
 import cv2
 import numpy as np
-#testing commit
-#testing to see if commit works
-def nothing(x):
-    pass
 
-x1 = []             ##List to store x coordinates
-y1 = []             ##List to store y coordinates
-Kernal = np.ones((5,5), np.uint8)
+frameWidth = 640
+frameHeight = 480
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)     ##Change resolution of the camera
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-_, frame =cap.read()
-print(frame.shape)
-while(1):
-    ret, frame = cap.read()         ##Read frame
-    frame = cv2.flip(frame, +1)     ##Mirror image frame
-    if not ret:
+cap.set(3, frameWidth)
+cap.set(4, frameHeight)
+cap.set(10,150)
+
+myColors = [[5,107,0,19,255,255],#hue min ,hue max,sat min ,sat max, val min, val max
+            [133,56,0,159,156,255],
+            [57,76,0,100,255,255],
+            [90,48,0,118,255,255]]#Add other colours here
+
+myColorValues = [[51,153,255],          ## BGR format
+                 [255,0,255],
+                 [0,255,0],
+                 [255,0,0]] #Add other colours here
+
+
+myPoints =  []  ## [x , y , colorId ]
+
+
+def findColor(img,myColors, myColorValues ):
+    imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    count = 0
+    newPoints=[]
+    for color in myColors:
+        lower = np.array(color[0:3])
+        upper = np.array(color[3:6])
+        mask = cv2.inRange(imgHSV,lower,upper)
+        x,y=getContours(mask)
+        cv2.circle(imgResult,(x,y),10,(myColorValues[count]),cv2.FILLED)
+        if x!= 0 and y!= 0:
+            newPoints.append([x,y,count])
+        count += 1
+        # cv2.imshow(str(color[0]), mask)
+    return newPoints
+
+
+def getContours(img):
+    contours,hierarchy = cv2.findContours(img,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
+    x,y,w,h = 0,0,0,0
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area>500:
+            #cv2.drawContours(imgResult, cnt, -1, (255, 0, 0), 3) #To Know if colour is being detected correctly
+            peri = cv2.arcLength(cnt,True)
+            approx = cv2.approxPolyDP(cnt,0.02*peri,True)
+            x, y, w, h = cv2.boundingRect(approx)
+    return  x+w//2,y
+
+def drawOnCanvas(myPoints,myColorValues):
+    for point in myPoints:
+        cv2.circle(imgResult, (point[0], point[1]), 10, myColorValues[point[2]], cv2.FILLED)
+
+while True:
+    success, img = cap.read()
+    imgResult = img.copy()
+    newPoints = findColor(img, myColors, myColorValues )
+    if len(newPoints) != 0:
+         for newP in newPoints:
+             myPoints.append(newP)
+    if len(myPoints) != 0:
+        drawOnCanvas(myPoints,myColorValues)
+
+    cv2.imshow("Result", imgResult)
+    if cv2.waitKey(1) & 0xFF ==  ord('q'):
         break
-    frame2 = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)     ##BGR to HLS conversion
-    if cv2.waitKey(1) == ord('s'):
-        break
-
-    lb = np.array([0, 0, 81])               ##Masking parameters
-    ub = np.array([185, 255, 255])
-
-    mask = cv2.inRange(frame2, lb, ub)      ##Create mask
-    cv2.imshow('Mask', mask)
-
-    res = cv2.bitwise_and(frame, frame, mask = mask)        ##apply mask on original image
-    cv2.imshow('Res', res)
-
-    opening = cv2.morphologyEx(mask, cv2.MORPH_OPEN, Kernal)        ##Apply opening morphology
-    cv2.imshow('Opening', opening)
-
-    dilation = cv2.dilate(opening, Kernal, iterations=5)            ##Apply dilation morphology
-    cv2.imshow('Dilation', dilation)
-
-    contours, hierarchy = cv2.findContours(opening, cv2.RETR_TREE,      ##FInd contours
-                                           cv2.CHAIN_APPROX_SIMPLE)
-    for contour in contours:
-        if cv2.contourArea(contour) > 1500:         ##Find contour with largest area
-            cnt = contour
-    M = cv2.moments(cnt)
-    cx = int(M['m10'] / M['m00'])           ##Find centroid
-    cy = int(M['m01'] / M['m00'])
-    cv2.circle(frame, (cx, cy), 5, [50, 120, 255], -1)      ##Draw centroid
-    extTop = tuple(cnt[cnt[:, :, 1].argmin()][0])           ##Find topmost point of object
-    print(cx - extTop[0])
-    if abs(cy - extTop[1]) > 200 and abs(cx - extTop[0]) < 150:     ##Distance between centroid and topmost point
-        x1.append(extTop[0])
-        y1.append(extTop[1])
-
-    for i in range(len(x1)):
-        cv2.circle(frame, (x1[i], y1[i]), 4, (255, 155, 100), 5)        ##Draw circle
-    cv2.imshow('Resuting Image', frame)
-
-cap.release()       ##Release memory
-cv2.destroyAllWindows()     ##Destroy all windows
