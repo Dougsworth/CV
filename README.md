@@ -1,1 +1,1 @@
-Learning to use opencv and pycharm to create  ~virtual paint~
+using opencv and pycharm to create  ~virtual paint~
